@@ -133,7 +133,7 @@ class EmailService {
             messageId: "",
             status: "failed",
             message: "Unknown error occurred",
-            providerResponse: null,
+            providerResponse: undefined,
         };
     }
     /**

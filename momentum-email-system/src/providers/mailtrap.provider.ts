@@ -1,19 +1,61 @@
 import crypto from "crypto";
 import {
-    EmailAddress,
-    EmailMessage,
-    EmailProvider,
-    EmailProviderError,
-    EmailSendResult,
-    EmailStatus,
-    EmailTemplate,
-    MailtrapConfig,
-    MailtrapErrorResponse,
-    MailtrapSendResponse,
-    MailtrapWebhookPayload,
-    RateLimitInfo,
-    WebhookEvent,
+  EmailAddress,
+  EmailMessage,
+  EmailProvider,
+  EmailProviderError,
+  EmailSendResult,
+  EmailStatus,
+  EmailTemplate,
+  JsonObject,
+  MailtrapConfig,
+  MailtrapErrorResponse,
+  MailtrapSendResponse,
+  MailtrapWebhookPayload,
+  ProviderApiResponse,
+  RateLimitInfo,
+  WebhookEvent
 } from "../types/email-provider";
+
+// Mailtrap-specific payload interfaces
+interface MailtrapEmailPayload {
+  from: {
+    email: string;
+    name?: string;
+  };
+  to: Array<{
+    email: string;
+    name?: string;
+  }>;
+  cc?: Array<{
+    email: string;
+    name?: string;
+  }>;
+  bcc?: Array<{
+    email: string;
+    name?: string;
+  }>;
+  subject: string;
+  text?: string;
+  html?: string;
+  headers?: Record<string, string>;
+  attachments?: Array<{
+    filename: string;
+    content: string;
+    type: string;
+    disposition?: string;
+    content_id?: string;
+  }>;
+  custom_variables?: JsonObject;
+  tags?: string[];
+  template_uuid?: string;
+  template_variables?: JsonObject;
+}
+
+interface MailtrapEmailAddress {
+  email: string;
+  name?: string;
+}
 
 interface RateLimitState {
   count: number;
@@ -72,23 +114,33 @@ export class MailtrapProvider implements EmailProvider {
       // Send with retry logic
       const response = await this.sendWithRetry(payload);
 
+      // Check for successful message ID
+      if (!response.message_id && !response.message_uuid) {
+        throw this.createError(
+          "Email send failed.",
+          "SEND_ERROR",
+          500,
+          true
+        );
+      }
+
       return {
         messageId: response.message_id || response.message_uuid,
         status: "sent",
         message: "Email sent successfully",
-        providerResponse: response,
+        providerResponse: {
+          status: 200,
+          statusText: "OK",
+          headers: {},
+          data: response as any,
+        },
       };
     } catch (error) {
       // If email sending failed, decrement the rate limit counter
       this.decrementRateLimit();
-      
-      const emailError = error as EmailProviderError;
-      return {
-        messageId: "",
-        status: "failed",
-        message: emailError.message,
-        providerResponse: emailError.providerResponse,
-      };
+
+      // Re-throw the error so callers can handle it properly
+      throw error;
     }
   }
 
@@ -119,7 +171,7 @@ export class MailtrapProvider implements EmailProvider {
   }
 
   async processWebhook(
-    payload: any,
+    payload: unknown,
     signature?: string
   ): Promise<WebhookEvent> {
     try {
@@ -144,9 +196,9 @@ export class MailtrapProvider implements EmailProvider {
         timestamp: new Date(mailtrapPayload.timestamp * 1000),
         data: {
           inboxId: mailtrapPayload.inbox_id,
-          response: mailtrapPayload.response,
-          category: mailtrapPayload.category,
-          customVariables: mailtrapPayload.custom_variables,
+          response: mailtrapPayload.response || '',
+          category: mailtrapPayload.category || '',
+          customVariables: mailtrapPayload.custom_variables || {},
         },
         signature,
       };
@@ -334,14 +386,27 @@ export class MailtrapProvider implements EmailProvider {
     }
   }
 
-  async getProviderStats(): Promise<any> {
+  async getProviderStats(): Promise<ProviderApiResponse> {
     try {
       // Note: Mailtrap doesn't provide comprehensive stats API
       // This would need to be tracked internally or via webhooks
-      return {
-        provider: "Mailtrap",
+      const stats = {
+        totalSent: this.rateLimitState.count,
+        totalDelivered: 0,
+        totalBounced: 0,
+        totalFailed: 0,
         rateLimit: await this.checkRateLimit(),
-        lastActivity: new Date(),
+        provider: "Mailtrap",
+        apiEndpoint: this.config.apiUrl || "https://send.api.mailtrap.io/api/send",
+        healthStatus: await this.healthCheck(),
+        lastActivity: new Date().toISOString(),
+      };
+
+      return {
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        data: stats as any,
       };
     } catch (error) {
       throw this.createError(
@@ -362,8 +427,8 @@ export class MailtrapProvider implements EmailProvider {
     }
   }
 
-  private prepareEmailPayload(message: EmailMessage): any {
-    const payload: any = {
+  private prepareEmailPayload(message: EmailMessage): MailtrapEmailPayload {
+    const payload: MailtrapEmailPayload = {
       from: this.formatEmailAddress(message.from),
       to: message.to.map((addr) => this.formatEmailAddress(addr)),
       subject: message.subject,
@@ -393,7 +458,7 @@ export class MailtrapProvider implements EmailProvider {
     if (message.attachments && message.attachments.length > 0) {
       payload.attachments = message.attachments.map((att) => ({
         filename: att.filename,
-        content: att.content,
+        content: Buffer.isBuffer(att.content) ? att.content.toString('base64') : att.content,
         type: att.contentType,
         disposition: att.disposition || "attachment",
         content_id: att.contentId,
@@ -415,17 +480,17 @@ export class MailtrapProvider implements EmailProvider {
     return payload;
   }
 
-  private formatEmailAddress(address: EmailAddress): any {
+  private formatEmailAddress(address: EmailAddress): MailtrapEmailAddress {
     if (address.name) {
       return {
         email: address.email,
         name: address.name,
       };
     }
-    return address.email;
+    return { email: address.email };
   }
 
-  private async sendWithRetry(payload: any): Promise<MailtrapSendResponse> {
+  private async sendWithRetry(payload: MailtrapEmailPayload): Promise<MailtrapSendResponse> {
     let lastError: Error | null = null;
     const maxRetries = this.config.retries || 3;
 
@@ -454,7 +519,7 @@ export class MailtrapProvider implements EmailProvider {
     throw lastError;
   }
 
-  private async makeHttpRequest(payload: any): Promise<MailtrapSendResponse> {
+  private async makeHttpRequest(payload: MailtrapEmailPayload): Promise<MailtrapSendResponse> {
     const controller = new AbortController();
     const timeoutId = setTimeout(
       () => controller.abort(),
@@ -472,14 +537,24 @@ export class MailtrapProvider implements EmailProvider {
         signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
 
       const responseData = await response.json();
 
       if (!response.ok) {
         const errorResponse = responseData as MailtrapErrorResponse;
+        let errorMessage = errorResponse.message || "Unknown error";
+        
+        // Make authentication errors more descriptive
+        if (response.status === 401) {
+          errorMessage = "Unauthorized - authentication failed";
+        } else if (response.status === 429) {
+          errorMessage = "Rate limit exceeded - too many requests";
+        } else if (response.status >= 500) {
+          errorMessage = "Server error - API temporarily unavailable";
+        }
+        
         throw this.createError(
-          errorResponse.message || "Unknown error",
+          errorMessage,
           errorResponse.error || "API_ERROR",
           response.status,
           this.isRetryableStatus(response.status),

@@ -2,11 +2,13 @@ import "dotenv/config";
 import { supabase } from "./config/supabase";
 import { EmailCampaignService } from "./services/email-campaign.service";
 import { EmailQueueService } from "./services/email-queue.service";
+import { RealtimeMonitorService } from "./services/realtime-monitor.service";
 
-console.log("🚀 Starting Advanced Email Campaign System...");
+console.log("🚀 Starting Advanced Email Campaign System with Real-time Monitoring...");
 
 const emailService = new EmailCampaignService();
 const queueService = new EmailQueueService();
+const realtimeMonitor = new RealtimeMonitorService();
 
 async function demonstrateEmailSystem() {
   try {
@@ -42,6 +44,39 @@ async function demonstrateEmailSystem() {
     console.log(`   📝 Templates: ${templatesCount}`);
     console.log(`   📢 Campaigns: ${campaignsCount}`);
 
+    // Start Real-time Monitoring
+    console.log("\n🔄 Starting Real-time Monitoring...");
+
+    // Subscribe to real-time updates
+    const unsubscribeCampaignStats = realtimeMonitor.subscribeToCampaignStats((stats) => {
+      console.log(`📈 Real-time Campaign Update [${stats.campaignName || stats.campaignId}]:`, {
+        sent: stats.totalSent,
+        delivered: stats.delivered,
+        opened: stats.opened,
+        deliveryRate: stats.deliveryRate.toFixed(1) + '%',
+        openRate: stats.openRate.toFixed(1) + '%',
+        status: stats.status
+      });
+    });
+
+    const unsubscribeQueueUpdates = realtimeMonitor.subscribeToQueueUpdates((update) => {
+      console.log(`⚡ Queue Update [${update.campaignId}]:`, {
+        status: update.status,
+        totalInQueue: update.totalInQueue,
+        processed: update.processed
+      });
+    });
+
+    const unsubscribeTemplateUpdates = realtimeMonitor.subscribeToTemplateUpdates((update) => {
+      console.log(`📝 Template Update [${update.templateName}]:`, {
+        id: update.templateId,
+        lastModified: update.lastModified
+      });
+    });
+
+    // Start global monitoring for all campaigns
+    await realtimeMonitor.startGlobalMonitoring();
+
     // Create a test campaign if we have data
     if (contactsCount > 0 && templatesCount > 0) {
       console.log("\n🚀 Testing Campaign Functions...");
@@ -58,6 +93,9 @@ async function demonstrateEmailSystem() {
         });
 
         console.log(`✅ Created campaign: ${campaign.name}`);
+
+        // Start monitoring this specific campaign
+        await realtimeMonitor.startCampaignMonitoring(campaign.id);
 
         // Start the campaign
         console.log("\n🎯 Starting Campaign...");
@@ -89,6 +127,20 @@ async function demonstrateEmailSystem() {
             "📊 Campaign Stats:",
             JSON.stringify(campaignStats, null, 2)
           );
+
+          // Show real-time stats
+          console.log("\n📊 Real-time Campaign Stats:");
+          const realtimeStats = realtimeMonitor.getCampaignStats(campaign.id);
+          if (realtimeStats) {
+            console.log("📈 Real-time Stats:", {
+              sent: realtimeStats.totalSent,
+              delivered: realtimeStats.delivered,
+              opened: realtimeStats.opened,
+              deliveryRate: realtimeStats.deliveryRate.toFixed(1) + '%',
+              openRate: realtimeStats.openRate.toFixed(1) + '%',
+              queueStatus: realtimeStats.queueStatus
+            });
+          }
 
           // Test rate limiting
           console.log("\n🚦 Rate Limiting Test:");
@@ -158,7 +210,18 @@ async function demonstrateEmailSystem() {
     console.log("🗑️ Cleanup Result:", cleanupResult);
 
     console.log("\n✨ All PostgreSQL functions tested successfully!");
-    console.log("\n🎉 Advanced Email Campaign System is ready for production!");
+    console.log("\n🎉 Advanced Email Campaign System with Real-time Monitoring is ready for production!");
+
+    // Store unsubscribe functions for cleanup
+    process.on('SIGINT', async () => {
+      console.log('\n🛑 Gracefully shutting down...');
+      unsubscribeCampaignStats();
+      unsubscribeQueueUpdates();
+      unsubscribeTemplateUpdates();
+      await realtimeMonitor.stopAllMonitoring();
+      process.exit(0);
+    });
+
   } catch (error) {
     console.error("❌ Error:", error);
   }
@@ -167,7 +230,7 @@ async function demonstrateEmailSystem() {
 async function main() {
   await demonstrateEmailSystem();
 
-  console.log("\n🔄 System is now running...");
+  console.log("\n🔄 System is now running with Real-time Monitoring...");
   console.log("📍 Supabase Studio: http://127.0.0.1:54323");
   console.log("📧 Email testing: http://127.0.0.1:54324");
   console.log("📊 Available Functions:");
@@ -181,6 +244,11 @@ async function main() {
   console.log("   SELECT * FROM process_email_queue(25);");
   console.log("   SELECT * FROM start_campaign('campaign-uuid');");
   console.log("   SELECT * FROM get_enhanced_campaign_stats('campaign-uuid');");
+  console.log("\n🔄 Real-time Features Active:");
+  console.log("   • Campaign stats monitoring");
+  console.log("   • Email queue tracking");
+  console.log("   • Template collaboration");
+  console.log("   • Instant delivery notifications");
   console.log("\n💡 Press Ctrl+C to stop the server.");
 
   // Keep the process running

@@ -44,7 +44,12 @@ class MailtrapProvider {
                 messageId: response.message_id || response.message_uuid,
                 status: "sent",
                 message: "Email sent successfully",
-                providerResponse: response,
+                providerResponse: {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {},
+                    data: response,
+                },
             };
         }
         catch (error) {
@@ -96,9 +101,9 @@ class MailtrapProvider {
                 timestamp: new Date(mailtrapPayload.timestamp * 1000),
                 data: {
                     inboxId: mailtrapPayload.inbox_id,
-                    response: mailtrapPayload.response,
-                    category: mailtrapPayload.category,
-                    customVariables: mailtrapPayload.custom_variables,
+                    response: mailtrapPayload.response || '',
+                    category: mailtrapPayload.category || '',
+                    customVariables: mailtrapPayload.custom_variables || {},
                 },
                 signature,
             };
@@ -242,10 +247,22 @@ class MailtrapProvider {
         try {
             // Note: Mailtrap doesn't provide comprehensive stats API
             // This would need to be tracked internally or via webhooks
-            return {
-                provider: "Mailtrap",
+            const stats = {
+                totalSent: this.rateLimitState.count,
+                totalDelivered: 0,
+                totalBounced: 0,
+                totalFailed: 0,
                 rateLimit: await this.checkRateLimit(),
-                lastActivity: new Date(),
+                provider: "Mailtrap",
+                apiEndpoint: this.config.apiUrl || "https://send.api.mailtrap.io/api/send",
+                healthStatus: await this.healthCheck(),
+                lastActivity: new Date().toISOString(),
+            };
+            return {
+                status: 200,
+                statusText: "OK",
+                headers: {},
+                data: stats,
             };
         }
         catch (error) {
@@ -286,7 +303,7 @@ class MailtrapProvider {
         if (message.attachments && message.attachments.length > 0) {
             payload.attachments = message.attachments.map((att) => ({
                 filename: att.filename,
-                content: att.content,
+                content: Buffer.isBuffer(att.content) ? att.content.toString('base64') : att.content,
                 type: att.contentType,
                 disposition: att.disposition || "attachment",
                 content_id: att.contentId,
@@ -310,7 +327,7 @@ class MailtrapProvider {
                 name: address.name,
             };
         }
-        return address.email;
+        return { email: address.email };
     }
     async sendWithRetry(payload) {
         let lastError = null;

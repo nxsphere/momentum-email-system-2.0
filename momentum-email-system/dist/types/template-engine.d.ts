@@ -1,9 +1,10 @@
+import { JsonObject, JsonValue } from "./email-provider";
 import { EmailTemplate } from "./email-system";
 export interface TemplateVariable {
     name: string;
     type: "string" | "number" | "boolean" | "date" | "url" | "email";
     required: boolean;
-    defaultValue?: any;
+    defaultValue?: JsonValue;
     description?: string;
     validation?: {
         pattern?: string;
@@ -20,12 +21,12 @@ export interface TemplateContext {
         first_name?: string;
         last_name?: string;
         full_name?: string;
-        metadata?: Record<string, any>;
+        metadata?: JsonObject;
     };
     campaign?: {
         id: string;
         name: string;
-        metadata?: Record<string, any>;
+        metadata?: JsonObject;
     };
     system: {
         unsubscribe_url: string;
@@ -36,7 +37,7 @@ export interface TemplateContext {
         current_date: string;
         current_year: number;
     };
-    variables: Record<string, any>;
+    variables: JsonObject;
 }
 export interface TemplateValidationResult {
     valid: boolean;
@@ -173,7 +174,7 @@ export interface TemplateEngine {
     validateTemplate(template: EmailTemplate): Promise<TemplateValidationResult>;
     compileTemplate(template: EmailTemplate): Promise<CompiledTemplate>;
     precompileTemplates(templateIds: string[]): Promise<void>;
-    renderPreview(template: EmailTemplate, sampleData?: Record<string, any>): Promise<RenderResult>;
+    renderPreview(template: EmailTemplate, sampleData?: JsonObject): Promise<RenderResult>;
     extractVariables(templateContent: string): TemplateVariable[];
     generateSampleContext(variables: TemplateVariable[]): TemplateContext;
     getStats(): Promise<TemplateEngineStats>;
@@ -186,7 +187,7 @@ export interface PersonalizationData {
     email: string;
     company?: string;
     job_title?: string;
-    custom_fields?: Record<string, any>;
+    custom_fields?: JsonObject;
 }
 export interface UnsubscribeConfig {
     enabled: boolean;

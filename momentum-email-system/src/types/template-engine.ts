@@ -1,10 +1,11 @@
+import { JsonObject, JsonValue } from "./email-provider";
 import { EmailTemplate } from "./email-system";
 
 export interface TemplateVariable {
   name: string;
   type: "string" | "number" | "boolean" | "date" | "url" | "email";
   required: boolean;
-  defaultValue?: any;
+  defaultValue?: JsonValue;
   description?: string;
   validation?: {
     pattern?: string;
@@ -23,14 +24,14 @@ export interface TemplateContext {
     first_name?: string;
     last_name?: string;
     full_name?: string;
-    metadata?: Record<string, any>;
+    metadata?: JsonObject;
   };
 
   // Campaign information
   campaign?: {
     id: string;
     name: string;
-    metadata?: Record<string, any>;
+    metadata?: JsonObject;
   };
 
   // System variables
@@ -45,7 +46,7 @@ export interface TemplateContext {
   };
 
   // Custom variables
-  variables: Record<string, any>;
+  variables: JsonObject;
 }
 
 export interface TemplateValidationResult {
@@ -245,7 +246,7 @@ export interface TemplateEngine {
   // Preview functionality
   renderPreview(
     template: EmailTemplate,
-    sampleData?: Record<string, any>
+    sampleData?: JsonObject
   ): Promise<RenderResult>;
 
   // Utility functions
@@ -265,7 +266,7 @@ export interface PersonalizationData {
   email: string;
   company?: string;
   job_title?: string;
-  custom_fields?: Record<string, any>;
+  custom_fields?: JsonObject;
 }
 
 export interface UnsubscribeConfig {

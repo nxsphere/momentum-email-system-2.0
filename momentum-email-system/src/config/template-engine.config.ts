@@ -91,7 +91,8 @@ export function createTemplateEngineConfig(): TemplateEngineFactoryConfig {
         maxVariables: parseInt(process.env.MAX_TEMPLATE_VARIABLES || "100"),
         allowScriptTags: false,
         allowStyleTags: true,
-        sanitizeHtml: environment === "production",
+        // SECURITY: Always enable sanitization by default (can be explicitly disabled via env var)
+        sanitizeHtml: process.env.DISABLE_HTML_SANITIZATION !== "true",
       },
       textGeneration: {
         wordwrap: parseInt(process.env.TEXT_WORDWRAP || "80"),

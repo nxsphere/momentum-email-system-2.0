@@ -1,10 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.defaultTemplateEngineConfig = exports.templateEngine = void 0;
-exports.createTemplateEngineConfig = createTemplateEngineConfig;
-exports.createTemplateEngine = createTemplateEngine;
-exports.validateTemplateEngineConfig = validateTemplateEngineConfig;
-exports.createTemplateContext = createTemplateContext;
+exports.createTemplateContext = exports.defaultTemplateEngineConfig = exports.templateEngine = exports.validateTemplateEngineConfig = exports.createTemplateEngine = exports.createTemplateEngineConfig = void 0;
 const template_engine_service_1 = require("../services/template-engine.service");
 const template_storage_service_1 = require("../services/template-storage.service");
 const tracking_url_service_1 = require("../services/tracking-url.service");
@@ -64,7 +60,8 @@ function createTemplateEngineConfig() {
                 maxVariables: parseInt(process.env.MAX_TEMPLATE_VARIABLES || "100"),
                 allowScriptTags: false,
                 allowStyleTags: true,
-                sanitizeHtml: environment === "production",
+                // SECURITY: Always enable sanitization by default (can be explicitly disabled via env var)
+                sanitizeHtml: process.env.DISABLE_HTML_SANITIZATION !== "true",
             },
             textGeneration: {
                 wordwrap: parseInt(process.env.TEXT_WORDWRAP || "80"),
@@ -76,6 +73,7 @@ function createTemplateEngineConfig() {
         environment,
     };
 }
+exports.createTemplateEngineConfig = createTemplateEngineConfig;
 function createTemplateEngine(config) {
     const defaultConfig = createTemplateEngineConfig();
     const mergedConfig = { ...defaultConfig, ...config };
@@ -92,6 +90,7 @@ function createTemplateEngine(config) {
     // Create template engine
     return new template_engine_service_1.HandlebarsTemplateEngine(storage, trackingService, mergedConfig.engine);
 }
+exports.createTemplateEngine = createTemplateEngine;
 // Environment variable validation
 function validateTemplateEngineConfig() {
     const errors = [];
@@ -127,6 +126,7 @@ function validateTemplateEngineConfig() {
         errors,
     };
 }
+exports.validateTemplateEngineConfig = validateTemplateEngineConfig;
 // Default template engine instance
 exports.templateEngine = createTemplateEngine();
 // Export commonly used configurations
@@ -208,4 +208,5 @@ function createTemplateContext(contact, variables = {}, campaign) {
         variables,
     };
 }
+exports.createTemplateContext = createTemplateContext;
 //# sourceMappingURL=template-engine.config.js.map

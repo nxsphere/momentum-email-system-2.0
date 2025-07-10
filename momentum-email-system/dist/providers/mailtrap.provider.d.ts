@@ -1,4 +1,4 @@
-import { EmailMessage, EmailProvider, EmailSendResult, EmailStatus, EmailTemplate, MailtrapConfig, RateLimitInfo, WebhookEvent } from "../types/email-provider";
+import { EmailMessage, EmailProvider, EmailSendResult, EmailStatus, EmailTemplate, MailtrapConfig, ProviderApiResponse, RateLimitInfo, WebhookEvent } from "../types/email-provider";
 export declare class MailtrapProvider implements EmailProvider {
     name: string;
     private config;
@@ -7,7 +7,7 @@ export declare class MailtrapProvider implements EmailProvider {
     constructor(config: MailtrapConfig, webhookSecret?: string);
     sendEmail(message: EmailMessage): Promise<EmailSendResult>;
     getEmailStatus(messageId: string): Promise<EmailStatus>;
-    processWebhook(payload: any, signature?: string): Promise<WebhookEvent>;
+    processWebhook(payload: unknown, signature?: string): Promise<WebhookEvent>;
     verifyWebhookSignature(payload: any, signature: string): boolean;
     checkRateLimit(): Promise<RateLimitInfo>;
     /**
@@ -25,7 +25,7 @@ export declare class MailtrapProvider implements EmailProvider {
         html: string;
         text: string;
     }>;
-    getProviderStats(): Promise<any>;
+    getProviderStats(): Promise<ProviderApiResponse>;
     healthCheck(): Promise<boolean>;
     private prepareEmailPayload;
     private formatEmailAddress;

@@ -302,6 +302,27 @@ deno_version = 1
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Edge Functions configuration
+[functions.email-processor]
+# Cron-triggered function to process email queue in batches
+verify_jwt = false
+
+[functions.webhook-handler]
+# Handles Mailtrap webhooks for tracking updates
+verify_jwt = false
+
+[functions.campaign-scheduler]
+# Checks for scheduled campaigns and starts them
+verify_jwt = false
+
+[functions.bounce-processor]
+# Handles bounce notifications and updates contact status
+verify_jwt = false
+
+[functions.webhook-mailtrap]
+# Legacy webhook handler (consider migrating to webhook-handler)
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

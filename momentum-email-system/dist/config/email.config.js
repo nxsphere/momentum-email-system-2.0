@@ -1,9 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.emailService = void 0;
-exports.createEmailConfig = createEmailConfig;
-exports.createEmailService = createEmailService;
-exports.validateEmailConfig = validateEmailConfig;
+exports.emailService = exports.validateEmailConfig = exports.createEmailService = exports.createEmailConfig = void 0;
 const mailtrap_provider_1 = require("../providers/mailtrap.provider");
 const email_service_1 = require("../services/email.service");
 function createEmailConfig() {
@@ -51,10 +48,12 @@ function createEmailConfig() {
         service: serviceOptions,
     };
 }
+exports.createEmailConfig = createEmailConfig;
 function createEmailService() {
     const config = createEmailConfig();
     return new email_service_1.EmailService(config.service);
 }
+exports.createEmailService = createEmailService;
 // Environment variable validation
 function validateEmailConfig() {
     const errors = [];
@@ -91,6 +90,7 @@ function validateEmailConfig() {
         errors,
     };
 }
+exports.validateEmailConfig = validateEmailConfig;
 // Helper function to validate email
 function isValidEmail(email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

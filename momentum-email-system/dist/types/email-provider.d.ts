@@ -1,3 +1,38 @@
+/// <reference types="node" />
+/// <reference types="node" />
+export type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
+export interface JsonObject {
+    [key: string]: JsonValue;
+}
+export interface JsonArray extends Array<JsonValue> {
+}
+export type UUID = string & {
+    readonly brand: unique symbol;
+};
+export declare const UUID: {
+    /**
+     * Validates if a string is a valid UUID format
+     */
+    isValid(value: string): value is UUID;
+    /**
+     * Creates a UUID type from a validated string
+     */
+    from(value: string): UUID;
+    /**
+     * Creates a UUID type from any string (for testing)
+     */
+    fromString(value: string): UUID;
+    /**
+     * Generates a new UUID (requires external uuid library)
+     */
+    generate(): UUID;
+};
+export interface ProviderApiResponse {
+    status: number;
+    statusText: string;
+    headers: Record<string, string>;
+    data: JsonValue;
+}
 export interface EmailAddress {
     email: string;
     name?: string;
@@ -11,7 +46,7 @@ export interface EmailAttachment {
 }
 export interface EmailTemplate {
     id: string;
-    variables: Record<string, any>;
+    variables: JsonObject;
 }
 export interface EmailMessage {
     from: EmailAddress;
@@ -25,32 +60,32 @@ export interface EmailMessage {
     attachments?: EmailAttachment[];
     headers?: Record<string, string>;
     tags?: string[];
-    metadata?: Record<string, any>;
+    metadata?: JsonObject;
 }
 export interface EmailSendResult {
     messageId: string;
     status: "sent" | "queued" | "failed";
     message?: string;
-    providerResponse?: any;
+    providerResponse?: ProviderApiResponse;
 }
 export interface EmailStatus {
     messageId: string;
     status: "sent" | "delivered" | "opened" | "clicked" | "bounced" | "failed" | "spam";
     timestamp: Date;
     events: EmailEvent[];
-    metadata?: Record<string, any>;
+    metadata?: JsonObject;
 }
 export interface EmailEvent {
     type: "sent" | "delivered" | "opened" | "clicked" | "bounced" | "failed" | "spam";
     timestamp: Date;
-    data?: Record<string, any>;
+    data?: JsonObject;
 }
 export interface WebhookEvent {
     messageId: string;
     event: string;
     email: string;
     timestamp: Date;
-    data: Record<string, any>;
+    data: JsonObject;
     signature?: string;
 }
 export interface EmailProviderConfig {
@@ -73,14 +108,14 @@ export interface EmailProviderError extends Error {
     code?: string;
     statusCode?: number;
     retryable?: boolean;
-    providerResponse?: any;
+    providerResponse?: ProviderApiResponse;
 }
 export interface EmailProvider {
     name: string;
     sendEmail(message: EmailMessage): Promise<EmailSendResult>;
     getEmailStatus(messageId: string): Promise<EmailStatus>;
-    processWebhook(payload: any, signature?: string): Promise<WebhookEvent>;
-    verifyWebhookSignature(payload: any, signature: string): boolean;
+    processWebhook(payload: JsonValue, signature?: string): Promise<WebhookEvent>;
+    verifyWebhookSignature(payload: JsonValue, signature: string): boolean;
     checkRateLimit(): Promise<RateLimitInfo>;
     validateTemplate(template: EmailTemplate): Promise<boolean>;
     renderTemplate(template: EmailTemplate): Promise<{
@@ -88,7 +123,7 @@ export interface EmailProvider {
         html: string;
         text: string;
     }>;
-    getProviderStats?(): Promise<any>;
+    getProviderStats?(): Promise<ProviderApiResponse>;
     healthCheck?(): Promise<boolean>;
 }
 export interface EmailServiceOptions {
@@ -105,7 +140,7 @@ export interface SendEmailOptions {
     trackOpens?: boolean;
     trackClicks?: boolean;
     allowRetries?: boolean;
-    metadata?: Record<string, any>;
+    metadata?: JsonObject;
 }
 export interface EmailServiceStats {
     totalSent: number;
@@ -132,10 +167,20 @@ export interface MailtrapWebhookPayload {
     timestamp: number;
     response?: string;
     category?: string;
-    custom_variables?: Record<string, any>;
+    custom_variables?: JsonObject;
 }
 export interface MailtrapErrorResponse {
     error: string;
     message: string;
     status: number;
+}
+export interface MailtrapProviderStats {
+    totalSent: number;
+    totalDelivered: number;
+    totalBounced: number;
+    totalFailed: number;
+    rateLimit: RateLimitInfo;
+    apiEndpoint: string;
+    healthStatus: boolean;
+    lastActivity: Date;
 }

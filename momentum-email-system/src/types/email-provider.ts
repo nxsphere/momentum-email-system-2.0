@@ -1,3 +1,58 @@
+// JSON-serializable data types
+export type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
+export interface JsonObject {
+  [key: string]: JsonValue;
+}
+export interface JsonArray extends Array<JsonValue> {}
+
+// UUID type for database compatibility
+export type UUID = string & { readonly brand: unique symbol };
+
+// UUID utility functions
+export const UUID = {
+  /**
+   * Validates if a string is a valid UUID format
+   */
+  isValid(value: string): value is UUID {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(value);
+  },
+
+  /**
+   * Creates a UUID type from a validated string
+   */
+  from(value: string): UUID {
+    if (!UUID.isValid(value)) {
+      throw new Error(`Invalid UUID format: ${value}`);
+    }
+    return value as UUID;
+  },
+
+  /**
+   * Creates a UUID type from any string (for testing)
+   */
+  fromString(value: string): UUID {
+    return value as UUID;
+  },
+
+  /**
+   * Generates a new UUID (requires external uuid library)
+   */
+  generate(): UUID {
+    // This would use the uuid library in practice
+    // For now, return a placeholder type-safe UUID
+    return crypto.randomUUID() as UUID;
+  }
+};
+
+// Provider response types
+export interface ProviderApiResponse {
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  data: JsonValue;
+}
+
 export interface EmailAddress {
   email: string;
   name?: string;
@@ -13,7 +68,7 @@ export interface EmailAttachment {
 
 export interface EmailTemplate {
   id: string;
-  variables: Record<string, any>;
+  variables: JsonObject;
 }
 
 export interface EmailMessage {
@@ -28,14 +83,14 @@ export interface EmailMessage {
   attachments?: EmailAttachment[];
   headers?: Record<string, string>;
   tags?: string[];
-  metadata?: Record<string, any>;
+  metadata?: JsonObject;
 }
 
 export interface EmailSendResult {
   messageId: string;
   status: "sent" | "queued" | "failed";
   message?: string;
-  providerResponse?: any;
+  providerResponse?: ProviderApiResponse;
 }
 
 export interface EmailStatus {
@@ -50,7 +105,7 @@ export interface EmailStatus {
     | "spam";
   timestamp: Date;
   events: EmailEvent[];
-  metadata?: Record<string, any>;
+  metadata?: JsonObject;
 }
 
 export interface EmailEvent {
@@ -63,7 +118,7 @@ export interface EmailEvent {
     | "failed"
     | "spam";
   timestamp: Date;
-  data?: Record<string, any>;
+  data?: JsonObject;
 }
 
 export interface WebhookEvent {
@@ -71,7 +126,7 @@ export interface WebhookEvent {
   event: string;
   email: string;
   timestamp: Date;
-  data: Record<string, any>;
+  data: JsonObject;
   signature?: string;
 }
 
@@ -97,7 +152,7 @@ export interface EmailProviderError extends Error {
   code?: string;
   statusCode?: number;
   retryable?: boolean;
-  providerResponse?: any;
+  providerResponse?: ProviderApiResponse;
 }
 
 export interface EmailProvider {
@@ -108,8 +163,8 @@ export interface EmailProvider {
   getEmailStatus(messageId: string): Promise<EmailStatus>;
 
   // Webhook handling
-  processWebhook(payload: any, signature?: string): Promise<WebhookEvent>;
-  verifyWebhookSignature(payload: any, signature: string): boolean;
+  processWebhook(payload: JsonValue, signature?: string): Promise<WebhookEvent>;
+  verifyWebhookSignature(payload: JsonValue, signature: string): boolean;
 
   // Rate limiting
   checkRateLimit(): Promise<RateLimitInfo>;
@@ -121,7 +176,7 @@ export interface EmailProvider {
   ): Promise<{ subject: string; html: string; text: string }>;
 
   // Provider-specific methods
-  getProviderStats?(): Promise<any>;
+  getProviderStats?(): Promise<ProviderApiResponse>;
   healthCheck?(): Promise<boolean>;
 }
 
@@ -140,7 +195,7 @@ export interface SendEmailOptions {
   trackOpens?: boolean;
   trackClicks?: boolean;
   allowRetries?: boolean;
-  metadata?: Record<string, any>;
+  metadata?: JsonObject;
 }
 
 export interface EmailServiceStats {
@@ -172,11 +227,22 @@ export interface MailtrapWebhookPayload {
   timestamp: number;
   response?: string;
   category?: string;
-  custom_variables?: Record<string, any>;
+  custom_variables?: JsonObject;
 }
 
 export interface MailtrapErrorResponse {
   error: string;
   message: string;
   status: number;
+}
+
+export interface MailtrapProviderStats {
+  totalSent: number;
+  totalDelivered: number;
+  totalBounced: number;
+  totalFailed: number;
+  rateLimit: RateLimitInfo;
+  apiEndpoint: string;
+  healthStatus: boolean;
+  lastActivity: Date;
 }

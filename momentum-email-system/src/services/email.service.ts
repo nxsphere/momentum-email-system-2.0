@@ -121,16 +121,16 @@ export class EmailService {
     maxRetries: number = 3
   ): Promise<EmailSendResult> {
     let lastError: Error | null = null;
-    
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         const result = await this.sendEmailOnce(message, options);
-        
+
         // If we succeeded after retries, log it
         if (attempt > 0 && this.options.logLevel === "debug") {
           console.log(`Email sent successfully on attempt ${attempt + 1}`);
         }
-        
+
         return result;
       } catch (error) {
         lastError = error as Error;
@@ -162,7 +162,7 @@ export class EmailService {
           if (emailError.statusCode === 429) {
             const rateLimitInfo = await this.provider.checkRateLimit();
             const timeUntilReset = rateLimitInfo.resetTime.getTime() - Date.now();
-            
+
             if (timeUntilReset > 0 && timeUntilReset < 300000) { // Max 5 minutes
               if (this.options.logLevel === "debug") {
                 console.warn(`Waiting ${Math.round(timeUntilReset / 1000)}s for rate limit reset...`);
@@ -192,7 +192,7 @@ export class EmailService {
       messageId: "",
       status: "failed",
       message: "Unknown error occurred",
-      providerResponse: null,
+      providerResponse: undefined,
     };
   }
 
@@ -223,7 +223,7 @@ export class EmailService {
         if (!signature) {
           throw new Error("Webhook signature is required when webhook secret is configured");
         }
-        
+
         if (!this.provider.verifyWebhookSignature(payload, signature)) {
           throw new Error("Invalid webhook signature");
         }

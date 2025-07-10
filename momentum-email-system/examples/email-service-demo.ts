@@ -238,7 +238,7 @@ export function createWebhookHandler() {
       res.status(200).json({ success: true, event: webhookEvent });
     } catch (error) {
       console.error("❌ Webhook processing failed:", error);
-      res.status(400).json({ success: false, error: error.message });
+      res.status(400).json({ success: false, error: (error as Error).message });
     }
   };
 }

@@ -1,0 +1,4 @@
+email,first_name,last_name,company,phone
+test1@example.com,John,Doe,ACME Corp,555-1234
+test2@example.com,Jane,Smith,Tech Inc,555-5678
+test3@example.com,Bob,Johnson,Startup LLC,555-9012

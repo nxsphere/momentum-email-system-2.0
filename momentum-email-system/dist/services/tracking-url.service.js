@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TrackingUtils = exports.TrackingUrlService = void 0;
-exports.createTrackingUrlService = createTrackingUrlService;
+exports.TrackingUtils = exports.createTrackingUrlService = exports.TrackingUrlService = void 0;
 class TrackingUrlService {
     constructor(baseUrl, config) {
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
@@ -213,6 +212,7 @@ function createTrackingUrlService(baseUrl, customConfig) {
     const config = { ...defaultConfig, ...customConfig };
     return new TrackingUrlService(baseUrl, config);
 }
+exports.createTrackingUrlService = createTrackingUrlService;
 // Utility functions for common tracking scenarios
 class TrackingUtils {
     static extractEmailFromTrackingUrl(url) {
