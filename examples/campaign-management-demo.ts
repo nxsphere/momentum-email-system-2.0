@@ -81,27 +81,126 @@ async function demonstrateCampaignManagement() {
     console.log("2️⃣ Creating Email Template\n");
 
     const template = await campaignService.createEmailTemplate({
-      name: "Welcome Campaign Template",
-      subject: "Welcome to Momentum Business Capital! 🎉",
-      html_content: `
-        <html>
-          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-              <h1 style="color: #2563eb;">Welcome {{first_name}}!</h1>
-              <p>Thank you for joining Momentum Business Capital. We're excited to help you grow your business.</p>
-              <p>As a valued customer, you'll receive:</p>
-              <ul>
-                <li>Priority customer support</li>
-                <li>Exclusive funding opportunities</li>
-                <li>Business growth resources</li>
-              </ul>
-              <p>Best regards,<br>The Momentum Team</p>
-            </div>
-          </body>
-        </html>
-      `,
-      text_content: "Welcome {{first_name}}! Thank you for joining Momentum Business Capital...",
-      variables: { first_name: "Customer" }
+      name: "Momentum Capital Funding Offer",
+      subject: "Get Fast Business Capital with Momentum",
+      html_content: `<!DOCTYPE html>
+<html lang=\"en\">
+<head>
+  <meta charset=\"UTF-8\">
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+  <title>Fast Business Capital | Momentum</title>
+  <style type=\"text/css\">
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { border: 0; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
+    body { margin: 0; padding: 0; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; background: #fafbfc; }
+    .container { max-width: 600px; margin: 0 auto; }
+    * { box-sizing: border-box; }
+    table { max-width: 100%; }
+    img { max-width: 100%; height: auto; }
+    .cta-modern {
+      background: rgb(84, 182, 78);
+      color: #ffffff !important;
+      padding: 16px 32px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 600;
+      display: inline-block;
+      text-align: center;
+      transition: all 0.3s ease;
+      border: 2px solid rgb(84, 182, 78);
+      margin: 0 auto;
+    }
+    .stat-item {
+      text-align: center;
+      padding: 20px 15px;
+    }
+    .stat-number {
+      font-size: 32px;
+      font-weight: 800;
+      color: #1a1a1a;
+      line-height: 1;
+      margin: 0;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #374151;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin: 5px 0 0 0;
+    }
+    @media only screen and (max-width: 600px) {
+      .container { width: 100% !important; }
+      .mobile-padding { padding: 25px 20px !important; }
+      h1 {
+        font-size: 32px !important;
+        line-height: 38px !important;
+        margin-bottom: 20px !important;
+      }
+      .cta-modern {
+        display: block !important;
+        width: 100% !important;
+        max-width: 320px !important;
+        margin: 15px auto !important;
+        padding: 18px 24px !important;
+        font-size: 18px !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <table width=\"100%\" bgcolor=\"#fafbfc\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" role=\"presentation\">
+    <tr>
+      <td align=\"center\" class=\"mobile-padding\" style=\"padding: 40px 20px;\">
+        <table class=\"container\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\" style=\"border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);\">
+          <tr>
+            <td class=\"mobile-padding\" style=\"padding: 30px 40px 20px 40px; border-bottom: 1px solid #f1f5f9; text-align: center;\">
+              <a href=\"https://momentumbusinesscapital.com\" target=\"_blank\">
+                <img src=\"https://momentumbusinesscapital.com/assets/logo.png\" alt=\"Momentum Business Capital\" width=\"180\" style=\"margin-bottom: 10px;\" />
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td class=\"mobile-padding\" style=\"padding: 40px 40px 30px 40px; text-align: center;\">
+              <h1 style=\"font-size: 40px; color: #22223b; margin: 0 0 18px 0; font-weight: 800;\">Get Fast Business Capital</h1>
+              <p style=\"font-size: 18px; color: #374151; margin: 0 0 28px 0;\">Unlock funding for your business in as little as 24 hours. Flexible terms. No hidden fees. Trusted by thousands of business owners.</p>
+              <a href=\"https://momentumbusinesscapital.com/apply\" class=\"cta-modern\">Apply Now</a>
+            </td>
+          </tr>
+          <tr>
+            <td style=\"padding: 0 40px 40px 40px;\">
+              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">
+                <tr>
+                  <td class=\"stat-item\">
+                    <div class=\"stat-number\">$500M+</div>
+                    <div class=\"stat-label\">Funded</div>
+                  </td>
+                  <td class=\"stat-item\">
+                    <div class=\"stat-number\">24hr</div>
+                    <div class=\"stat-label\">Approvals</div>
+                  </td>
+                  <td class=\"stat-item\">
+                    <div class=\"stat-number\">4.9/5</div>
+                    <div class=\"stat-label\">Trustpilot</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style=\"padding: 0 40px 40px 40px; text-align: center; color: #6b7280; font-size: 13px;\">
+              <p style=\"margin: 0;\">Questions? <a href=\"mailto:support@momentumbusinesscapital.com\" style=\"color: #2563eb; text-decoration: underline;\">Contact our team</a></p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+      text_content: "Get Fast Business Capital with Momentum. Unlock funding for your business in as little as 24 hours. Apply now at https://momentumbusinesscapital.com/apply",
+      variables: { business_name: "Momentum Business Capital" }
     });
     console.log("✅ Created email template:", template.name, "\n");
 
