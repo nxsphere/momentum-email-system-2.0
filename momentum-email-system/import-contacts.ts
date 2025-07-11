@@ -18,7 +18,7 @@ interface ImportContact {
   email: string;
   first_name?: string;
   last_name?: string;
-  status?: 'active' | 'unsubscribed' | 'bounced';
+  status: 'active' | 'unsubscribed' | 'bounced';
   metadata?: Record<string, any>;
 }
 
@@ -56,23 +56,23 @@ class ContactImporter {
     }
 
     const csvContent = fs.readFileSync(filePath, 'utf-8');
-    const lines = csvContent.split('\n').filter(line => line.trim());
+    const rows = this.parseCSV(csvContent);
 
-    if (lines.length === 0) {
+    if (rows.length === 0) {
       throw new Error('CSV file is empty');
     }
 
     // Parse header row
-    const headers = lines[0].split(',').map(h => h.trim());
+    const headers = rows[0];
     console.log(`📋 CSV headers found: ${headers.join(', ')}`);
 
     // Process data rows
     const contacts: ImportContact[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim());
+    for (let i = 1; i < rows.length; i++) {
+      const values = rows[i];
 
       if (values.length !== headers.length) {
-        console.log(`⚠️  Skipping malformed row ${i + 1}: ${lines[i]}`);
+        console.log(`⚠️  Skipping malformed row ${i + 1}: ${values.join(',').substring(0, 100)}...`);
         continue;
       }
 
@@ -83,6 +83,74 @@ class ContactImporter {
     }
 
     return await this.importContacts(contacts);
+  }
+
+  /**
+   * Parse CSV content handling quoted fields with commas and newlines
+   */
+  private parseCSV(csvContent: string): string[][] {
+    const rows: string[][] = [];
+    const lines = csvContent.split('\n');
+    let currentRow: string[] = [];
+    let currentField = '';
+    let inQuotes = false;
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+      let j = 0;
+
+      while (j < line.length) {
+        const char = line[j];
+
+        if (char === '"') {
+          if (inQuotes && j + 1 < line.length && line[j + 1] === '"') {
+            // Escaped quote
+            currentField += '"';
+            j += 2;
+          } else {
+            // Toggle quote state
+            inQuotes = !inQuotes;
+            j++;
+          }
+        } else if (char === ',' && !inQuotes) {
+          // Field separator
+          currentRow.push(currentField.trim());
+          currentField = '';
+          j++;
+        } else {
+          currentField += char;
+          j++;
+        }
+      }
+
+      if (inQuotes) {
+        // Multi-line field, add newline and continue to next line
+        currentField += '\n';
+        i++;
+      } else {
+        // End of row
+        if (currentField || currentRow.length > 0) {
+          currentRow.push(currentField.trim());
+        }
+        if (currentRow.length > 0) {
+          rows.push(currentRow);
+        }
+        currentRow = [];
+        currentField = '';
+        i++;
+      }
+    }
+
+    // Handle last field if needed
+    if (currentField || currentRow.length > 0) {
+      currentRow.push(currentField.trim());
+      if (currentRow.length > 0) {
+        rows.push(currentRow);
+      }
+    }
+
+    return rows;
   }
 
   /**
@@ -180,11 +248,24 @@ class ContactImporter {
       return null;
     }
 
+    // Map status values to database enum
+    let status: 'active' | 'unsubscribed' | 'bounced' = 'active';
+    if (statusIndex !== -1 && values[statusIndex]) {
+      const csvStatus = values[statusIndex].toLowerCase();
+      if (csvStatus === 'subscribed' || csvStatus === 'active') {
+        status = 'active';
+      } else if (csvStatus === 'unsubscribed') {
+        status = 'unsubscribed';
+      } else if (csvStatus === 'bounced') {
+        status = 'bounced';
+      }
+    }
+
     return {
       email: values[emailIndex],
       first_name: firstNameIndex !== -1 ? values[firstNameIndex] : undefined,
       last_name: lastNameIndex !== -1 ? values[lastNameIndex] : undefined,
-      status: statusIndex !== -1 ? values[statusIndex] as any : 'active',
+      status: status,
       metadata: this.extractCSVMetadata(headers, values, [emailIndex, firstNameIndex, lastNameIndex, statusIndex])
     };
   }
@@ -297,19 +378,44 @@ class ContactImporter {
 
   /**
    * Get existing emails from database to avoid duplicates
+   * Process in batches to avoid URL length limits
    */
   private async getExistingEmails(emails: string[]): Promise<Set<string>> {
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('email')
-      .in('email', emails);
+    const existingEmails = new Set<string>();
+    const batchSize = 500; // Process 500 emails at a time
 
-    if (error) {
-      console.log('Warning: Could not check for existing emails:', error.message);
-      return new Set();
+    console.log(`🔍 Checking for existing emails in batches of ${batchSize}...`);
+
+    for (let i = 0; i < emails.length; i += batchSize) {
+      const batch = emails.slice(i, i + batchSize);
+
+      try {
+        const { data, error } = await supabase
+          .from('contacts')
+          .select('email')
+          .in('email', batch);
+
+        if (error) {
+          console.log(`⚠️  Warning: Could not check batch ${Math.floor(i/batchSize) + 1}:`, error.message);
+          continue;
+        }
+
+        data?.forEach(contact => {
+          existingEmails.add(contact.email.toLowerCase());
+        });
+
+        // Show progress for large imports
+        if (emails.length > 1000) {
+          console.log(`   Checked ${Math.min(i + batchSize, emails.length)} of ${emails.length} emails...`);
+        }
+
+      } catch (error) {
+        console.log(`⚠️  Warning: Error checking batch ${Math.floor(i/batchSize) + 1}:`, error.message);
+      }
     }
 
-    return new Set(data?.map(contact => contact.email.toLowerCase()) || []);
+    console.log(`✅ Found ${existingEmails.size} existing emails to skip`);
+    return existingEmails;
   }
 
   /**
