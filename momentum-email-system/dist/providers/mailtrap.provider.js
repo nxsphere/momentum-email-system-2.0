@@ -40,6 +40,10 @@ class MailtrapProvider {
             const payload = this.prepareEmailPayload(message);
             // Send with retry logic
             const response = await this.sendWithRetry(payload);
+            // Check for successful message ID
+            if (!response.message_id && !response.message_uuid) {
+                throw this.createError("Email send failed.", "SEND_ERROR", 500, true);
+            }
             return {
                 messageId: response.message_id || response.message_uuid,
                 status: "sent",
@@ -55,13 +59,8 @@ class MailtrapProvider {
         catch (error) {
             // If email sending failed, decrement the rate limit counter
             this.decrementRateLimit();
-            const emailError = error;
-            return {
-                messageId: "",
-                status: "failed",
-                message: emailError.message,
-                providerResponse: emailError.providerResponse,
-            };
+            // Re-throw the error so callers can handle it properly
+            throw error;
         }
     }
     async getEmailStatus(messageId) {
@@ -365,11 +364,21 @@ class MailtrapProvider {
                 body: JSON.stringify(payload),
                 signal: controller.signal,
             });
-            clearTimeout(timeoutId);
             const responseData = await response.json();
             if (!response.ok) {
                 const errorResponse = responseData;
-                throw this.createError(errorResponse.message || "Unknown error", errorResponse.error || "API_ERROR", response.status, this.isRetryableStatus(response.status), responseData);
+                let errorMessage = errorResponse.message || "Unknown error";
+                // Make authentication errors more descriptive
+                if (response.status === 401) {
+                    errorMessage = "Unauthorized - authentication failed";
+                }
+                else if (response.status === 429) {
+                    errorMessage = "Rate limit exceeded - too many requests";
+                }
+                else if (response.status >= 500) {
+                    errorMessage = "Server error - API temporarily unavailable";
+                }
+                throw this.createError(errorMessage, errorResponse.error || "API_ERROR", response.status, this.isRetryableStatus(response.status), responseData);
             }
             return responseData;
         }

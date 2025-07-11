@@ -9,16 +9,21 @@ console.log("🚀 Starting Advanced Email Campaign System with Real-time Monitor
 const emailService = new email_campaign_service_1.EmailCampaignService();
 const queueService = new email_queue_service_1.EmailQueueService();
 const realtimeMonitor = new realtime_monitor_service_1.RealtimeMonitorService();
+// Global shutdown flag
+let isShuttingDown = false;
 async function demonstrateEmailSystem() {
     try {
         console.log("\n📊 Testing Advanced Email Campaign System...");
-        // Test database connection
+        // Test database connection with proper error handling
+        console.log("🔄 Checking database connection...");
         const { data: _data, error } = await supabase_1.supabase
             .from("contacts")
             .select("count")
             .limit(1);
         if (error) {
-            console.log("✅ Database connection successful! (Expected for new database)");
+            console.error("❌ Database connection failed:", error.message);
+            console.error("🚨 Cannot continue without database connection");
+            process.exit(1);
         }
         else {
             console.log("✅ Database connection successful!");
@@ -64,6 +69,30 @@ async function demonstrateEmailSystem() {
         });
         // Start global monitoring for all campaigns
         await realtimeMonitor.startGlobalMonitoring();
+        // Setup graceful shutdown handlers
+        const gracefulShutdown = async (signal) => {
+            if (isShuttingDown)
+                return;
+            isShuttingDown = true;
+            console.log(`\n🛑 Received ${signal}, gracefully shutting down...`);
+            try {
+                // Cleanup subscriptions
+                unsubscribeCampaignStats();
+                unsubscribeQueueUpdates();
+                unsubscribeTemplateUpdates();
+                // Stop monitoring
+                await realtimeMonitor.stopAllMonitoring();
+                console.log('✅ Cleanup completed successfully');
+            }
+            catch (error) {
+                console.error('❌ Error during cleanup:', error);
+            }
+            finally {
+                process.exit(0);
+            }
+        };
+        process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+        process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
         // Create a test campaign if we have data
         if (contactsCount > 0 && templatesCount > 0) {
             console.log("\n🚀 Testing Campaign Functions...");
@@ -155,44 +184,52 @@ async function demonstrateEmailSystem() {
         console.log("🗑️ Cleanup Result:", cleanupResult);
         console.log("\n✨ All PostgreSQL functions tested successfully!");
         console.log("\n🎉 Advanced Email Campaign System with Real-time Monitoring is ready for production!");
-        // Store unsubscribe functions for cleanup
-        process.on('SIGINT', async () => {
-            console.log('\n🛑 Gracefully shutting down...');
-            unsubscribeCampaignStats();
-            unsubscribeQueueUpdates();
-            unsubscribeTemplateUpdates();
-            await realtimeMonitor.stopAllMonitoring();
-            process.exit(0);
-        });
     }
     catch (error) {
         console.error("❌ Error:", error);
+        process.exit(1);
     }
 }
 async function main() {
-    await demonstrateEmailSystem();
-    console.log("\n🔄 System is now running with Real-time Monitoring...");
-    console.log("📍 Supabase Studio: http://127.0.0.1:54323");
-    console.log("📧 Email testing: http://127.0.0.1:54324");
-    console.log("📊 Available Functions:");
-    console.log("   • process_email_queue(batch_size)");
-    console.log("   • start_campaign(campaign_id)");
-    console.log("   • update_email_status(message_id, status, tracking_data)");
-    console.log("   • get_enhanced_campaign_stats(campaign_id)");
-    console.log("   • handle_bounce(email, reason)");
-    console.log("   • cleanup_old_data(days_old)");
-    console.log("\n📖 Usage Examples:");
-    console.log("   SELECT * FROM process_email_queue(25);");
-    console.log("   SELECT * FROM start_campaign('campaign-uuid');");
-    console.log("   SELECT * FROM get_enhanced_campaign_stats('campaign-uuid');");
-    console.log("\n🔄 Real-time Features Active:");
-    console.log("   • Campaign stats monitoring");
-    console.log("   • Email queue tracking");
-    console.log("   • Template collaboration");
-    console.log("   • Instant delivery notifications");
-    console.log("\n💡 Press Ctrl+C to stop the server.");
-    // Keep the process running
-    process.stdin.resume();
+    try {
+        await demonstrateEmailSystem();
+        console.log("\n🔄 System is now running with Real-time Monitoring...");
+        console.log("📍 Supabase Studio: http://127.0.0.1:54323");
+        console.log("📧 Email testing: http://127.0.0.1:54324");
+        console.log("📊 Available Functions:");
+        console.log("   • process_email_queue(batch_size)");
+        console.log("   • start_campaign(campaign_id)");
+        console.log("   • update_email_status(message_id, status, tracking_data)");
+        console.log("   • get_enhanced_campaign_stats(campaign_id)");
+        console.log("   • handle_bounce(email, reason)");
+        console.log("   • cleanup_old_data(days_old)");
+        console.log("\n📖 Usage Examples:");
+        console.log("   SELECT * FROM process_email_queue(25);");
+        console.log("   SELECT * FROM start_campaign('campaign-uuid');");
+        console.log("   SELECT * FROM get_enhanced_campaign_stats('campaign-uuid');");
+        console.log("\n🔄 Real-time Features Active:");
+        console.log("   • Campaign stats monitoring");
+        console.log("   • Email queue tracking");
+        console.log("   • Template collaboration");
+        console.log("   • Instant delivery notifications");
+        console.log("\n💡 Press Ctrl+C to stop the server.");
+        // Use a proper event loop instead of process.stdin.resume()
+        // This prevents the process from hanging while allowing clean shutdown
+        const healthCheckInterval = setInterval(() => {
+            if (isShuttingDown) {
+                clearInterval(healthCheckInterval);
+                return;
+            }
+            // Health check or minimal periodic task
+        }, 30000); // Check every 30 seconds
+    }
+    catch (error) {
+        console.error("❌ Fatal error:", error);
+        process.exit(1);
+    }
 }
-main().catch(console.error);
+main().catch((error) => {
+    console.error("❌ Unhandled error:", error);
+    process.exit(1);
+});
 //# sourceMappingURL=index.js.map
