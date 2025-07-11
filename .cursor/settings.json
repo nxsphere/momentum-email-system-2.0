@@ -1,0 +1,25 @@
+{
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "**/.env": false,
+    "**/.env.*": false,
+    "**/.env.example": false
+  },
+  "files.associations": {
+    ".env*": "dotenv",
+    "*.env": "dotenv"
+  },
+  "env.autoHide": false,
+  "env.colorize": true,
+  "env.showInExplorer": true,
+  "dotenv.enableAutocloaking": false,
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/*/**": true,
+    "**/.env": false,
+    "**/.env.*": false
+  }
+}

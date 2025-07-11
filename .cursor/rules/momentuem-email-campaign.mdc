@@ -1,0 +1,10 @@
+---
+alwaysApply: true
+---
+- Always use TypeScript for type safety in email campaign functions
+- Implement proper error handling for all Mailtrap API calls
+- Include rate limiting checks in all email sending operations
+- Use Supabase Edge Functions for all cron job implementations
+- Never hardcode email templates - always use the database storage system
+- Include comprehensive logging for email delivery tracking
+- Follow the established schema patterns for contact and campaign data
