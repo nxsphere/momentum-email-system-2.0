@@ -61,13 +61,23 @@ class MemoryTemplateCache implements TemplateCache {
       this.currentMemoryBytes -= this.calculateTemplateSize(oldTemplate);
     }
 
-    // Evict templates if necessary
+    // Evict templates if necessary - batch eviction for efficiency
     while (
       (this.cache.size >= this.maxSize || 
        this.currentMemoryBytes + templateSize > this.maxMemoryBytes) &&
       this.cache.size > 0
     ) {
-      this.evictLeastRecentlyUsed();
+      // Batch evict multiple templates to prevent memory spikes
+      const evictCount = Math.max(1, Math.floor(this.cache.size * 0.1)); // Evict 10% at a time
+      for (let i = 0; i < evictCount && this.cache.size > 0; i++) {
+        this.evictLeastRecentlyUsed();
+      }
+      
+      // Safety check to prevent infinite loops
+      if (this.currentMemoryBytes + templateSize > this.maxMemoryBytes && this.cache.size === 0) {
+        console.warn(`Template ${templateId} too large even after clearing cache. Size: ${templateSize} bytes, Limit: ${this.maxMemoryBytes} bytes`);
+        return;
+      }
     }
 
     // Add new template
@@ -635,12 +645,26 @@ export class HandlebarsTemplateEngine implements TemplateEngine {
 
   extractVariables(templateContent: string): TemplateVariable[] {
     const variables: TemplateVariable[] = [];
-    const variablePattern = /\{\{\s*([^}]+)\s*\}\}/g;
     const found = new Set<string>();
 
+    // Prevent DoS attacks by limiting content size
+    if (templateContent.length > 100000) { // 100KB limit
+      throw new Error('Template content too large for variable extraction');
+    }
+
+    // Use safer regex pattern that prevents ReDoS
+    const variablePattern = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_\.]{0,100})\s*\}\}/g;
     let match;
-    while ((match = variablePattern.exec(templateContent)) !== null) {
+    let matchCount = 0;
+    const maxMatches = 1000; // Prevent infinite loops
+
+    while ((match = variablePattern.exec(templateContent)) !== null && matchCount < maxMatches) {
+      matchCount++;
       const variableName = match[1].trim();
+
+      // Additional safety checks
+      if (variableName.length > 100) continue; // Skip overly long variable names
+      if (variableName.includes('..')) continue; // Skip potentially malicious patterns
 
       // Skip Handlebars helpers and system variables
       if (
@@ -658,6 +682,10 @@ export class HandlebarsTemplateEngine implements TemplateEngine {
           required: false, // Make variables optional by default
         });
       }
+    }
+
+    if (matchCount >= maxMatches) {
+      console.warn(`Variable extraction stopped at ${maxMatches} matches to prevent DoS`);
     }
 
     return variables;

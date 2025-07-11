@@ -13,7 +13,60 @@ import {
   UpdateEmailStatusResult,
 } from "../types/email-system";
 
+// Webhook rate limiting state
+interface WebhookRateLimitState {
+  requests: Map<string, { count: number; resetTime: Date }>;
+  globalCount: number;
+  globalResetTime: Date;
+}
+
 export class EmailQueueService {
+  private webhookRateLimit: WebhookRateLimitState;
+  private readonly WEBHOOK_RATE_LIMIT_PER_IP = 100; // requests per hour per IP
+  private readonly WEBHOOK_RATE_LIMIT_GLOBAL = 1000; // requests per hour globally
+  private readonly WEBHOOK_RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour in ms
+
+  constructor() {
+    this.webhookRateLimit = {
+      requests: new Map(),
+      globalCount: 0,
+      globalResetTime: new Date(Date.now() + this.WEBHOOK_RATE_LIMIT_WINDOW),
+    };
+  }
+
+  // ==================== WEBHOOK RATE LIMITING ====================
+
+  private checkWebhookRateLimit(clientIp: string): { allowed: boolean; resetTime: Date } {
+    const now = new Date();
+    
+    // Check global rate limit
+    if (now > this.webhookRateLimit.globalResetTime) {
+      this.webhookRateLimit.globalCount = 0;
+      this.webhookRateLimit.globalResetTime = new Date(Date.now() + this.WEBHOOK_RATE_LIMIT_WINDOW);
+    }
+    
+    if (this.webhookRateLimit.globalCount >= this.WEBHOOK_RATE_LIMIT_GLOBAL) {
+      return { allowed: false, resetTime: this.webhookRateLimit.globalResetTime };
+    }
+    
+    // Check per-IP rate limit
+    const clientLimit = this.webhookRateLimit.requests.get(clientIp);
+    if (!clientLimit || now > clientLimit.resetTime) {
+      this.webhookRateLimit.requests.set(clientIp, {
+        count: 1,
+        resetTime: new Date(Date.now() + this.WEBHOOK_RATE_LIMIT_WINDOW),
+      });
+    } else {
+      if (clientLimit.count >= this.WEBHOOK_RATE_LIMIT_PER_IP) {
+        return { allowed: false, resetTime: clientLimit.resetTime };
+      }
+      clientLimit.count++;
+    }
+    
+    this.webhookRateLimit.globalCount++;
+    return { allowed: true, resetTime: this.webhookRateLimit.globalResetTime };
+  }
+
   // ==================== QUEUE MANAGEMENT ====================
 
   async getEmailQueue(limit = 100, offset = 0) {
@@ -341,8 +394,31 @@ export class EmailQueueService {
 
   // ==================== WEBHOOK HANDLERS ====================
 
-  async handleMailtrapWebhook(webhookData: any) {
+  async handleMailtrapWebhook(webhookData: any, clientIp: string = "unknown") {
+    // Check rate limiting first
+    const rateLimitResult = this.checkWebhookRateLimit(clientIp);
+    if (!rateLimitResult.allowed) {
+      const error = new Error(`Webhook rate limit exceeded. Try again after ${rateLimitResult.resetTime.toISOString()}`);
+      (error as any).statusCode = 429;
+      (error as any).resetTime = rateLimitResult.resetTime;
+      throw error;
+    }
+
+    // Validate webhook data
+    if (!webhookData || typeof webhookData !== 'object') {
+      const error = new Error('Invalid webhook payload');
+      (error as any).statusCode = 400;
+      throw error;
+    }
+
     const { message_id, event, email, reason } = webhookData;
+
+    // Basic validation
+    if (!message_id || !event) {
+      const error = new Error('Missing required webhook fields: message_id, event');
+      (error as any).statusCode = 400;
+      throw error;
+    }
 
     try {
       switch (event) {
@@ -382,16 +458,18 @@ export class EmailQueueService {
             null,
             "warning",
             `Unknown webhook event: ${event}`,
-            webhookData
+            { ...webhookData, clientIp }
           );
-          return { success: false, message: `Unknown event: ${event}` };
+          const error = new Error(`Unknown event: ${event}`);
+          (error as any).statusCode = 400;
+          throw error;
       }
     } catch (error) {
       await this.logCampaignEvent(
         null,
         "error",
         `Webhook processing failed: ${error}`,
-        webhookData
+        { ...webhookData, clientIp }
       );
       throw error;
     }

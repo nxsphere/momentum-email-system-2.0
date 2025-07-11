@@ -3,6 +3,44 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.EmailQueueService = void 0;
 const supabase_1 = require("../config/supabase");
 class EmailQueueService {
+    constructor() {
+        this.WEBHOOK_RATE_LIMIT_PER_IP = 100; // requests per hour per IP
+        this.WEBHOOK_RATE_LIMIT_GLOBAL = 1000; // requests per hour globally
+        this.WEBHOOK_RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour in ms
+        this.webhookRateLimit = {
+            requests: new Map(),
+            globalCount: 0,
+            globalResetTime: new Date(Date.now() + this.WEBHOOK_RATE_LIMIT_WINDOW),
+        };
+    }
+    // ==================== WEBHOOK RATE LIMITING ====================
+    checkWebhookRateLimit(clientIp) {
+        const now = new Date();
+        // Check global rate limit
+        if (now > this.webhookRateLimit.globalResetTime) {
+            this.webhookRateLimit.globalCount = 0;
+            this.webhookRateLimit.globalResetTime = new Date(Date.now() + this.WEBHOOK_RATE_LIMIT_WINDOW);
+        }
+        if (this.webhookRateLimit.globalCount >= this.WEBHOOK_RATE_LIMIT_GLOBAL) {
+            return { allowed: false, resetTime: this.webhookRateLimit.globalResetTime };
+        }
+        // Check per-IP rate limit
+        const clientLimit = this.webhookRateLimit.requests.get(clientIp);
+        if (!clientLimit || now > clientLimit.resetTime) {
+            this.webhookRateLimit.requests.set(clientIp, {
+                count: 1,
+                resetTime: new Date(Date.now() + this.WEBHOOK_RATE_LIMIT_WINDOW),
+            });
+        }
+        else {
+            if (clientLimit.count >= this.WEBHOOK_RATE_LIMIT_PER_IP) {
+                return { allowed: false, resetTime: clientLimit.resetTime };
+            }
+            clientLimit.count++;
+        }
+        this.webhookRateLimit.globalCount++;
+        return { allowed: true, resetTime: this.webhookRateLimit.globalResetTime };
+    }
     // ==================== QUEUE MANAGEMENT ====================
     async getEmailQueue(limit = 100, offset = 0) {
         const { data, error } = await supabase_1.supabase
@@ -262,8 +300,28 @@ class EmailQueueService {
         };
     }
     // ==================== WEBHOOK HANDLERS ====================
-    async handleMailtrapWebhook(webhookData) {
+    async handleMailtrapWebhook(webhookData, clientIp = "unknown") {
+        // Check rate limiting first
+        const rateLimitResult = this.checkWebhookRateLimit(clientIp);
+        if (!rateLimitResult.allowed) {
+            const error = new Error(`Webhook rate limit exceeded. Try again after ${rateLimitResult.resetTime.toISOString()}`);
+            error.statusCode = 429;
+            error.resetTime = rateLimitResult.resetTime;
+            throw error;
+        }
+        // Validate webhook data
+        if (!webhookData || typeof webhookData !== 'object') {
+            const error = new Error('Invalid webhook payload');
+            error.statusCode = 400;
+            throw error;
+        }
         const { message_id, event, email, reason } = webhookData;
+        // Basic validation
+        if (!message_id || !event) {
+            const error = new Error('Missing required webhook fields: message_id, event');
+            error.statusCode = 400;
+            throw error;
+        }
         try {
             switch (event) {
                 case "delivery":
@@ -281,12 +339,14 @@ class EmailQueueService {
                         reason: "marked as spam",
                     });
                 default:
-                    await this.logCampaignEvent(null, "warning", `Unknown webhook event: ${event}`, webhookData);
-                    return { success: false, message: `Unknown event: ${event}` };
+                    await this.logCampaignEvent(null, "warning", `Unknown webhook event: ${event}`, { ...webhookData, clientIp });
+                    const error = new Error(`Unknown event: ${event}`);
+                    error.statusCode = 400;
+                    throw error;
             }
         }
         catch (error) {
-            await this.logCampaignEvent(null, "error", `Webhook processing failed: ${error}`, webhookData);
+            await this.logCampaignEvent(null, "error", `Webhook processing failed: ${error}`, { ...webhookData, clientIp });
             throw error;
         }
     }

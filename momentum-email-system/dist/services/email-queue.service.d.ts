@@ -1,5 +1,11 @@
 import { CampaignLog, CampaignStats, CleanupResult, CreateEmailQueue, EmailQueue, HandleBounceResult, LogLevel, ProcessQueueResult, RateLimit, StartCampaignResult, UpdateEmailStatusResult } from "../types/email-system";
 export declare class EmailQueueService {
+    private webhookRateLimit;
+    private readonly WEBHOOK_RATE_LIMIT_PER_IP;
+    private readonly WEBHOOK_RATE_LIMIT_GLOBAL;
+    private readonly WEBHOOK_RATE_LIMIT_WINDOW;
+    constructor();
+    private checkWebhookRateLimit;
     getEmailQueue(limit?: number, offset?: number): Promise<EmailQueue[]>;
     getQueueForCampaign(campaignId: string): Promise<EmailQueue[]>;
     addToQueue(queueItem: CreateEmailQueue): Promise<EmailQueue>;
@@ -50,5 +56,5 @@ export declare class EmailQueueService {
         };
         rateLimits: any;
     }>;
-    handleMailtrapWebhook(webhookData: any): Promise<UpdateEmailStatusResult>;
+    handleMailtrapWebhook(webhookData: any, clientIp?: string): Promise<UpdateEmailStatusResult>;
 }

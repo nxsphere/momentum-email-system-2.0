@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import { createEmailService } from './src/config/email.config';
+import { EmailQueueService } from './src/services/email-queue.service';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -9,8 +10,9 @@ const port = process.env.PORT || 3000;
 app.use('/webhooks', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
-// Create email service instance
+// Create service instances
 const emailService = createEmailService();
+const queueService = new EmailQueueService();
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
@@ -24,14 +26,18 @@ app.get('/health', (_req, res) => {
 // Main webhook endpoint for Mailtrap
 app.post('/webhooks/mailtrap', async (req, res) => {
   try {
+    // Get client IP for rate limiting
+    const clientIp = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] as string || 'unknown';
+
     console.log('📬 Received webhook from Mailtrap');
+    console.log('Client IP:', clientIp);
     console.log('Headers:', req.headers);
     console.log('Body:', req.body);
 
     // Get the signature from headers
     const signature = req.headers['x-mailtrap-signature'] as string;
 
-        if (!signature) {
+    if (!signature) {
       console.warn('⚠️ No signature provided in webhook');
       res.status(400).json({
         success: false,
@@ -40,24 +46,20 @@ app.post('/webhooks/mailtrap', async (req, res) => {
       return;
     }
 
-    // Process the webhook through the email service
+    // Process the webhook through the rate-limited queue service
+    const result = await queueService.handleMailtrapWebhook(req.body, clientIp);
+
+    console.log('✅ Webhook processed successfully:', result);
+
+    // Also process through email service for signature verification
     const webhookEvent = await emailService.processWebhook(req.body, signature);
 
-    console.log('✅ Webhook processed successfully:', {
+    console.log('✅ Webhook event details:', {
       messageId: webhookEvent.messageId,
       event: webhookEvent.event,
       email: webhookEvent.email,
       timestamp: webhookEvent.timestamp
     });
-
-    // Here you would typically update your database
-    // Example: Update email log status in your campaign system
-    if (webhookEvent.messageId) {
-      console.log(`📊 Updating email status: ${webhookEvent.messageId} -> ${webhookEvent.event}`);
-
-      // Example database update (you'll implement this based on your needs)
-      // await updateEmailLogStatus(webhookEvent.messageId, webhookEvent.event, webhookEvent.data);
-    }
 
     // Respond to Mailtrap
     res.json({
@@ -69,7 +71,20 @@ app.post('/webhooks/mailtrap', async (req, res) => {
   } catch (error) {
     console.error('❌ Webhook processing failed:', error);
 
-    res.status(400).json({
+    // Handle rate limiting errors
+    if ((error as any).statusCode === 429) {
+      res.status(429).json({
+        success: false,
+        error: 'Rate limit exceeded',
+        message: (error as Error).message,
+        retryAfter: (error as any).resetTime
+      });
+      return;
+    }
+
+    // Handle other errors
+    const statusCode = (error as any).statusCode || 400;
+    res.status(statusCode).json({
       success: false,
       error: (error as Error).message
     });
